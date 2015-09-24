@@ -70,7 +70,9 @@ FILES_${PN}-templates += "${datadir}/lxc/templates"
 RDEPENDS_${PN}-templates += "bash"
 
 
-FILES_${PN} += "${systemd_unitdir}/system/lxc-net.service"
+FILES_${PN} += "${systemd_unitdir}/system/lxc-net.service \
+                ${systemd_unitdir}/system/lxc.service \
+               "
 
 #do_install_append() {
 #	# The /var/cache/lxc directory created by the Makefile
