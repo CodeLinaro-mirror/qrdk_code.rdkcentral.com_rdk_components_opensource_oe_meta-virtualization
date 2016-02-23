@@ -4,6 +4,7 @@ LICENSE = "GPLv2"
 LIC_FILES_CHKSUM = "file://COPYING;md5=4fbd65380cdd255951079008b364516c"
 PRIORITY = "optional"
 DEPENDS = "libxml2 libcap"
+DEPENDS_append_class-native = " gzip-native"
 RDEPENDS_${PN} = " \
 		rsync \
 		gzip \
@@ -19,6 +20,7 @@ RDEPENDS_${PN} = " \
 		perl-module-overload \
 		perl-module-exporter-heavy \
 "
+RDEPENDS_${PN}_class-native = " "
 RDEPENDS_${PN}-ptest += "file make"
 
 SRC_URI = "http://linuxcontainers.org/downloads/${BPN}-${PV}.tar.gz \
@@ -51,6 +53,7 @@ ${@bb.utils.contains('DISTRO_FEATURES', 'systemd', 'systemd', '', d)}"
 PACKAGECONFIG ??= "templates \
     ${@base_contains('DISTRO_FEATURES', 'selinux', 'selinux', '', d)} \
 "
+PACKAGECONFIG_class-native = ""
 PACKAGECONFIG[doc] = "--enable-doc --enable-api-docs,--disable-doc --disable-api-docs,,"
 PACKAGECONFIG[rpath] = "--enable-rpath,--disable-rpath,,"
 PACKAGECONFIG[apparmour] = "--enable-apparmor,--disable-apparmor,apparmor,apparmor"
@@ -135,3 +138,5 @@ fi
 EOF
 chmod 755 /etc/network/if-pre-up.d/lxcbr0
 }
+
+BBCLASSEXTEND = "native"
