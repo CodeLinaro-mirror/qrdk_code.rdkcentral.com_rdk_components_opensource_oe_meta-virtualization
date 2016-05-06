@@ -3,7 +3,7 @@ SECTION = "console/utils"
 LICENSE = "GPLv2"
 LIC_FILES_CHKSUM = "file://COPYING;md5=4fbd65380cdd255951079008b364516c"
 PRIORITY = "optional"
-DEPENDS = "libxml2 libcap"
+DEPENDS = "libxml2 libcap rsync"
 DEPENDS_append_class-native = " gzip-native"
 RDEPENDS_${PN} = " \
 		rsync \
