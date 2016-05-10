@@ -1,6 +1,7 @@
 LXC_PACKAGES ?= "${PN}"
 LXC_TEMPLATE ?= "lxc-xre"
 LXC_NAME ?= "xre"
+LXC_PATH = "/lxc"
 python __anonymous() {
     if "container" in d.getVar('MACHINEOVERRIDES', True):
         d.appendVar("DEPENDS", " lxc-native")
@@ -9,9 +10,13 @@ python __anonymous() {
 lxc_postinst() {
 rootDir="$D"
 if ${@ 'true' if "container" in d.getVar('MACHINEOVERRIDES', True) else 'false' }; then
-      mkdir -p ${rootDir}/lxc
-      echo "Executing :  lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}/lxc"
-      lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}/lxc
+    mkdir -p ${rootDir}${LXC_PATH}
+    echo "Executing :  lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH}"
+    lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH}
+    #Replace the rootfs path in config file  to  target runtime rootfs path
+    if [ -f "${rootDir}${LXC_PATH}/${LXC_NAME}/config" ];then
+        sed -i 's|'${rootDir}${LXC_PATH}'|'${LXC_PATH}'|g' "${rootDir}${LXC_PATH}/${LXC_NAME}/config"
+    fi
 fi
 }
 
