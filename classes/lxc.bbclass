@@ -17,6 +17,7 @@ if type lxc-create >/dev/null 2>/dev/null; then
     if [ -f "${rootDir}${LXC_PATH}/${LXC_NAME}/config" ];then
         sed -i 's|'${rootDir}${LXC_PATH}'|'${LXC_PATH}'|g' "${rootDir}${LXC_PATH}/${LXC_NAME}/config"
     fi
+    touch ${rootDir}${LXC_PATH}/${LXC_NAME}/${LXC_NAME}.log
 fi
 }
 
