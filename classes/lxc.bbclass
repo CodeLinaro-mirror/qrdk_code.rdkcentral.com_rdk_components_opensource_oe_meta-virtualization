@@ -17,6 +17,7 @@ if ${@ 'true' if "container" in d.getVar('MACHINEOVERRIDES', True) else 'false' 
     if [ -f "${rootDir}${LXC_PATH}/${LXC_NAME}/config" ];then
         sed -i 's|'${rootDir}${LXC_PATH}'|'${LXC_PATH}'|g' "${rootDir}${LXC_PATH}/${LXC_NAME}/config"
     fi
+    touch ${rootDir}${LXC_PATH}/${LXC_NAME}/${LXC_NAME}.log
 fi
 }
 
