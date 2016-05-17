@@ -2,6 +2,8 @@ LXC_PACKAGES ?= "${PN}"
 LXC_TEMPLATE ?= "lxc-xre"
 LXC_NAME ?= "xre"
 LXC_PATH = "/lxc"
+LXC_DISABLE_DLOG_DEMON ?= ""
+LXC_DISABLE_DLOG_FILE ?= ""
 python __anonymous() {
     if "container" in d.getVar('MACHINEOVERRIDES', True):
         d.appendVar("DEPENDS", " lxc-native")
@@ -13,11 +15,25 @@ if ${@ 'true' if "container" in d.getVar('MACHINEOVERRIDES', True) else 'false' 
     mkdir -p ${rootDir}${LXC_PATH}
     echo "Executing :  lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH}"
     lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH}
-    #Replace the rootfs path in config file  to  target runtime rootfs path
+
     if [ -f "${rootDir}${LXC_PATH}/${LXC_NAME}/config" ];then
+        #Replace the rootfs path in config file  to  target runtime rootfs path
         sed -i 's|'${rootDir}${LXC_PATH}'|'${LXC_PATH}'|g' "${rootDir}${LXC_PATH}/${LXC_NAME}/config"
+
+        # Create lxc log file
+        touch ${rootDir}${LXC_PATH}/${LXC_NAME}/${LXC_NAME}.log
+
+        # Remove module log from  dump log script
+        if [ "x${LXC_DISABLE_DLOG_DEMON}" != "x" ]  && [ "x${LXC_DISABLE_DLOG_FILE}" != "x" ];then
+            if [ -f "${rootDir}/lib/rdk/dumpLogs.sh" ];then
+                sed -i 's|'${LXC_DISABLE_DLOG_DEMON}'| |g' "${rootDir}/lib/rdk/dumpLogs.sh"
+                sed -i 's|'\${log_prefix}/${LXC_DISABLE_DLOG_FILE}'| |g' "${rootDir}/lib/rdk/dumpLogs.sh"
+            fi
+        fi
+
     fi
-    touch ${rootDir}${LXC_PATH}/${LXC_NAME}/${LXC_NAME}.log
+
+
 fi
 }
 
