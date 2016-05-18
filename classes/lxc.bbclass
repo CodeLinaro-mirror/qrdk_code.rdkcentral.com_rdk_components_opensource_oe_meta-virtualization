@@ -20,6 +20,9 @@ if ${@ 'true' if "container" in d.getVar('MACHINEOVERRIDES', True) else 'false' 
         #Replace the rootfs path in config file  to  target runtime rootfs path
         sed -i 's|'${rootDir}${LXC_PATH}'|'${LXC_PATH}'|g' "${rootDir}${LXC_PATH}/${LXC_NAME}/config"
 
+        ## Add Device specific include path in config.
+        sed -i '/lxc.hook/i\
+lxc.include = /usr/share/lxc/config/device.conf' ${rootDir}${LXC_PATH}/${LXC_NAME}/config
         # Create lxc log file
         touch ${rootDir}${LXC_PATH}/${LXC_NAME}/${LXC_NAME}.log
 
