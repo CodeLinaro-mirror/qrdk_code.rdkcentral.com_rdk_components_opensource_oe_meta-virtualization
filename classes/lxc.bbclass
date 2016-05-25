@@ -4,29 +4,38 @@ LXC_NAME ?= "xre"
 LXC_PATH = "/lxc"
 LXC_DISABLE_DLOG_DEMON ?= ""
 LXC_DISABLE_DLOG_FILE ?= ""
+LXC_LOG_PATH ?= "/opt/logs"
+LXC_LOG_LEVEL ?= "2"
+
 python __anonymous() {
     if "container" in d.getVar('MACHINEOVERRIDES', True):
         d.appendVar("DEPENDS", " lxc-native")
 }
 
 lxc_postinst() {
+
 rootDir="$D"
+
 if type lxc-create >/dev/null 2>/dev/null; then
     mkdir -p ${rootDir}${LXC_PATH}
     echo "Executing :  lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH}"
     lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH}
 
     if [ -f "${rootDir}${LXC_PATH}/${LXC_NAME}/config" ];then
-        #Replace the rootfs path in config file  to  target runtime rootfs path
+        ## Replace the rootfs path in config file  to  target runtime rootfs path
         sed -i 's|'${rootDir}${LXC_PATH}'|'${LXC_PATH}'|g' "${rootDir}${LXC_PATH}/${LXC_NAME}/config"
 
         ## Add Device specific include path in config.
         sed -i '/lxc.hook/i\
 lxc.include = /usr/share/lxc/config/device.conf' ${rootDir}${LXC_PATH}/${LXC_NAME}/config
-        # Create lxc log file
-        touch ${rootDir}${LXC_PATH}/${LXC_NAME}/${LXC_NAME}.log
 
-        # Remove module log from  dump log script
+        ## Add log file in container config
+        sed -i '/lxc.hook/i\
+lxc.logfile=${LXC_LOG_PATH}/${LXC_NAME}.log' ${rootDir}${LXC_PATH}/${LXC_NAME}/config
+        sed -i '/lxc.hook/i\
+lxc.loglevel=${LXC_LOG_LEVEL}' ${rootDir}${LXC_PATH}/${LXC_NAME}/config
+
+        ## Remove module log from  dump log script
         if [ "x${LXC_DISABLE_DLOG_DEMON}" != "x" ]  && [ "x${LXC_DISABLE_DLOG_FILE}" != "x" ];then
             if [ -f "${rootDir}/lib/rdk/dumpLogs.sh" ];then
                 sed -i 's|'${LXC_DISABLE_DLOG_DEMON}'| |g' "${rootDir}/lib/rdk/dumpLogs.sh"
@@ -35,7 +44,6 @@ lxc.include = /usr/share/lxc/config/device.conf' ${rootDir}${LXC_PATH}/${LXC_NAM
         fi
 
     fi
-
 
 fi
 }
