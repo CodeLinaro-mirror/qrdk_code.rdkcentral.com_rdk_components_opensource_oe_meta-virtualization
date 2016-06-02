@@ -17,11 +17,13 @@ lxc_postinst() {
 rootDir="$D"
 
 if ${@ 'true' if "container" in d.getVar('MACHINEOVERRIDES', True) else 'false' }; then
+
     mkdir -p ${rootDir}${LXC_PATH}
     echo "Executing :  lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH}"
     lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH}
 
     if [ -f "${rootDir}${LXC_PATH}/${LXC_NAME}/config" ];then
+
         ## Replace the rootfs path in config file  to  target runtime rootfs path
         sed -i 's|'${rootDir}${LXC_PATH}'|'${LXC_PATH}'|g' "${rootDir}${LXC_PATH}/${LXC_NAME}/config"
 
@@ -34,6 +36,10 @@ lxc.include = /usr/share/lxc/config/device.conf' ${rootDir}${LXC_PATH}/${LXC_NAM
 lxc.logfile=${LXC_LOG_PATH}/${LXC_NAME}.log' ${rootDir}${LXC_PATH}/${LXC_NAME}/config
         sed -i '/lxc.hook/i\
 lxc.loglevel=${LXC_LOG_LEVEL}' ${rootDir}${LXC_PATH}/${LXC_NAME}/config
+
+        ## Add CONTAINER_SUPPORT flag to true
+        grep -q "CONTAINER_SUPPORT" ${rootDir}/etc/device.properties || sed -i '$ a\
+CONTAINER_SUPPORT=true' ${rootDir}/etc/device.properties
 
         ## Remove module log from  dump log script
         if [ "x${LXC_DISABLE_DLOG_DEMON}" != "x" ]  && [ "x${LXC_DISABLE_DLOG_FILE}" != "x" ];then
