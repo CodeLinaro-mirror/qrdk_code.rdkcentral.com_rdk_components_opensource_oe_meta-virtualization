@@ -49,6 +49,19 @@ CONTAINER_SUPPORT=true' ${rootDir}/etc/device.properties
             fi
         fi
 
+        ## update lxc.service file with conditional flag
+        if [ -f "${rootDir}/lib/systemd/system/lxc.service" ];then
+            sed -i '/Description=/a\
+ConditionPathExists=!/opt/lxc_service_disabled' ${rootDir}/lib/systemd/system/lxc.service
+        fi
+
+        ## update xre-receiver.service with conditional flag
+        if [ -f "${rootDir}/lib/systemd/system/xre-receiver.service" ];then
+            sed -i '/Description=/a\
+ConditionPathExists=/opt/lxc_service_disabled' ${rootDir}/lib/systemd/system/xre-receiver.service
+        fi
+
+
     fi
 
 fi
