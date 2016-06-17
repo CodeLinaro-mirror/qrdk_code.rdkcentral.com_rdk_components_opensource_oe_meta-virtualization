@@ -19,8 +19,9 @@ rootDir="$D"
 if type lxc-create >/dev/null 2>/dev/null; then
 
     mkdir -p ${rootDir}${LXC_PATH}
-    echo "Executing :  lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH}"
-    lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH}
+    echo "Executing : lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH} -f ${NATIVE_ROOT}/${sysconfdir}/lxc/default.conf"
+
+    lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH} -f ${NATIVE_ROOT}/${sysconfdir}/lxc/default.conf
 
     if [ -f "${rootDir}${LXC_PATH}/${LXC_NAME}/config" ];then
 
