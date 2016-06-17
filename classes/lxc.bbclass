@@ -19,8 +19,9 @@ rootDir="$D"
 if ${@ 'true' if "container" in d.getVar('MACHINEOVERRIDES', True) else 'false' }; then
 
     mkdir -p ${rootDir}${LXC_PATH}
-    echo "Executing :  lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH}"
-    lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH}
+    echo "Executing : lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH} -f ${NATIVE_ROOT}/${sysconfdir}/lxc/default.conf"
+
+    lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH} -f ${NATIVE_ROOT}/${sysconfdir}/lxc/default.conf
 
     if [ -f "${rootDir}${LXC_PATH}/${LXC_NAME}/config" ];then
 
