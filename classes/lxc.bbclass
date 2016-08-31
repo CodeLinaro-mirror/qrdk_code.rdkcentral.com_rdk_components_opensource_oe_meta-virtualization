@@ -23,6 +23,11 @@ if ${@ 'true' if "container" in d.getVar('MACHINEOVERRIDES', True) else 'false' 
 
     lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH} -f ${NATIVE_ROOT}/${sysconfdir}/lxc/default.conf
 
+    if [ $? -ne 0 ]; then
+        echo "ERROR - Failed to create LXC container : ${LXC_NAME}"
+        exit 1
+    fi
+
     if [ -f "${rootDir}${LXC_PATH}/${LXC_NAME}/config" ];then
 
         ## Replace the rootfs path in config file  to  target runtime rootfs path
