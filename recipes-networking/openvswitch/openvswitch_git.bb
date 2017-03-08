@@ -2,6 +2,9 @@ require openvswitch.inc
 
 DEPENDS += "virtual/kernel"
 
+DEPENDS_remove_class-native = "virtual/kernel-native bridge-utils-native"
+RDEPENDS_${PN}_class-native = " "
+
 RDEPENDS_${PN}-ptest += "\
 	python-logging python-syslog python-argparse python-io \
 	python-fcntl python-shell python-lang python-xml python-math \
@@ -48,3 +51,5 @@ do_install_ptest() {
 do_install_append() {
 	oe_runmake modules_install INSTALL_MOD_PATH=${D}
 }
+
+BBCLASSEXTEND = "native"
