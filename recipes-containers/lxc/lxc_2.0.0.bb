@@ -172,3 +172,5 @@ fi
 EOF
 chmod 755 /etc/network/if-pre-up.d/lxcbr0
 }
+
+BBCLASSEXTEND = "native"
