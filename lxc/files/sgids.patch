@@ -1,0 +1,346 @@
+Patch for LXC to add lxc.sgids.auto and lxc.sgids.add to the container configuration
+file format, to permit precise control of supplementary GIDs in containers.
+
+This patch should be considered preliminary and subject to change.  Once it is
+stable, it will be offered back to LXC to form part of the official source tree.
+
+diff -Nrc original-lxc-1.1.4/src/lxc/conf.c lxc-1.1.4/src/lxc/conf.c
+*** original-lxc-1.1.4/src/lxc/conf.c	2015-10-06 15:18:16.000000000 +0100
+--- lxc-1.1.4/src/lxc/conf.c	2015-10-29 15:54:16.694858129 +0000
+***************
+*** 2538,2543 ****
+--- 2538,2545 ----
+  	lxc_list_init(&new->caps);
+  	lxc_list_init(&new->keepcaps);
+  	lxc_list_init(&new->id_map);
++ 	lxc_list_init(&new->sgids.groups);
++ 	new->sgids.group_user = NULL;
+  	lxc_list_init(&new->includes);
+  	lxc_list_init(&new->aliens);
+  	lxc_list_init(&new->environment);
+***************
+*** 4051,4056 ****
+--- 4053,4070 ----
+  	return 0;
+  }
+  
++ int lxc_clear_sgids(struct lxc_conf *c)
++ {
++ 	struct lxc_list *it,*next;
++ 
++ 	lxc_list_for_each_safe(it, &c->sgids.groups, next) {
++ 		lxc_list_del(it);
++ 		free(it->elem);
++ 		free(it);
++ 	}
++ 	return 0;
++ }
++ 
+  int lxc_clear_environment(struct lxc_conf *c)
+  {
+  	struct lxc_list *it,*next;
+***************
+*** 4176,4181 ****
+--- 4190,4197 ----
+  	lxc_clear_mount_entries(conf);
+  	lxc_clear_saved_nics(conf);
+  	lxc_clear_idmaps(conf);
++ 	lxc_clear_sgids(conf);
++ 	free(conf->sgids.group_user);
+  	lxc_clear_groups(conf);
+  	lxc_clear_includes(conf);
+  	lxc_clear_aliens(conf);
+***************
+*** 4514,4516 ****
+--- 4530,4640 ----
+  
+  	return result;
+  }
++ 
++ static int sgroups_qsort_aux(const void *a, const void *b)
++ {
++ 	const gid_t *ag = a, *bg = b;
++ 	if ( *ag < *bg ) return -1;
++ 	if ( *ag > *bg ) return +1;
++ 	return 0;
++ }
++ 
++ int prepare_sgids(struct lxc_conf *c)
++ {
++ 	const bool new_namespace = !lxc_list_empty(&c->id_map);
++ 
++ 	/* if we are in a new user namespace, we must always reset the supplementary
++ 	 * groups, otherwise, only reset them if either of the declarations is seen.
++ 	 */
++ 	c->sgids.setgroups = new_namespace || c->sgids.group_user || !lxc_list_empty(&c->sgids.groups);
++ 	c->sgids.ngids = 0;
++ 
++ 	if (c->sgids.setgroups) {
++ 		struct lxc_list *it,*next;
++ 
++ 		if (c->sgids.group_user) {
++ 			/* A username whose groups should become the set of groups was specified */
++ 			char buffer[BUFSIZ];
++ 			struct passwd pwd, *result;
++ 			int ngroups = NGROUPS_MAX;
++ 			if (getpwnam_r(c->sgids.group_user, &pwd, buffer, sizeof(buffer), &result)) {
++ 				SYSERROR("UID lookup for '%s' failed", c->sgids.group_user);
++ 				return 1;
++ 			}
++ 			if (result == NULL) {
++ 				ERROR("UID lookup for '%s' failed", c->sgids.group_user);
++ 				return 1;
++ 			}
++ 			if (getgrouplist(c->sgids.group_user, result->pw_gid, c->sgids.gids, &ngroups) == -1) {
++ 				SYSERROR("getgrouplist lookup for '%s' failed", c->sgids.group_user);
++ 			}
++ 			c->sgids.ngids = (size_t) ngroups;
++ 		}
++ 		else if (!new_namespace) {
++ 			/* No username specified, so use the current user's groups which will then be added to below */
++ 			int ngroups = getgroups(NGROUPS_MAX, c->sgids.gids);
++ 			if (ngroups == -1) {
++ 				SYSERROR("Current GID lookup failed\n");
++ 				return 1;
++ 			}
++ 			c->sgids.ngids = (size_t) ngroups;
++ 		}
++ 
++ 		if (c->sgids.ngids + lxc_list_len(&c->sgids.groups) >= NGROUPS_MAX) {
++ 			ERROR("Too many supplementary groups specified - max %u", NGROUPS_MAX);
++ 			return 1;
++ 		}
++ 
++ 		lxc_list_for_each_safe(it, &c->sgids.groups, next) {
++ 			char buffer[BUFSIZ], *ename;
++ 			struct group grp, *result;
++ 			const char *name = it->elem;
++ 
++ 			/* Try to see if it's numeric first, as getgrnam_r doesn't do so */
++ 			errno = 0;
++ 			grp.gr_gid = (gid_t) strtoul(name, &ename, 10);
++ 			if (errno == 0 && ename && *ename == '\0') {
++ 				result = &grp;
++ 			}
++ 			else if (getgrnam_r(name, &grp, buffer, sizeof(buffer), &result)) {
++ 				SYSERROR("GID lookup for '%s' failed", name);
++ 				return 1;
++ 			}
++ 			if (result == NULL) {
++ 				ERROR("GID lookup for '%s' failed", name);
++ 				return 1;
++ 			}
++ 			c->sgids.gids[c->sgids.ngids++] = result->gr_gid;
++ 		}
++ 
++ 		if (new_namespace) {
++ 			/* Map all the resulting GIDs into the new namespace */
++ 			size_t i;
++ 
++ 			for (i = 0; i != c->sgids.ngids; ++i) {
++ 				int mapped_gid = mapped_hostid(c->sgids.gids[i], c, ID_TYPE_GID);
++ 				if (mapped_gid == -1) {
++ 					ERROR("GID mapping failed for '%u'", c->sgids.gids[i]);
++ 					return 1;
++ 				}
++ 				c->sgids.gids[i] = (gid_t) mapped_gid;
++ 			}
++ 		}
++ 
++ 		/* Sort into numeric order for cosmetics and to simplify duplicate removal */
++ 		if (c->sgids.ngids > 1) {
++ 			qsort(c->sgids.gids, c->sgids.ngids, sizeof(c->sgids.gids[0]), sgroups_qsort_aux);
++ 			size_t i, j;
++ 
++ 			for (i = 0, j = 1; j != c->sgids.ngids; ++j) {
++ 				if (c->sgids.gids[i] != c->sgids.gids[j]) {
++ 					c->sgids.gids[++i] = c->sgids.gids[j];
++ 				}
++ 			}
++ 
++ 			c->sgids.ngids = i + 1;
++ 		}
++ 	}
++ 
++ 	return 0;
++ }
+diff -Nrc original-lxc-1.1.4/src/lxc/conf.h lxc-1.1.4/src/lxc/conf.h
+*** original-lxc-1.1.4/src/lxc/conf.h	2015-10-06 15:18:16.000000000 +0100
+--- lxc-1.1.4/src/lxc/conf.h	2015-10-29 15:54:16.695858122 +0000
+***************
+*** 287,292 ****
+--- 287,300 ----
+  	char *orig_name;
+  };
+  
++ struct lxc_sgids {
++ 	bool setgroups;
++ 	char *group_user;
++ 	struct lxc_list groups;
++ 	size_t ngids;
++ 	gid_t gids[NGROUPS_MAX];
++ };
++ 
+  struct lxc_conf {
+  	int is_execute;
+  	char *fstab;
+***************
+*** 297,302 ****
+--- 305,311 ----
+  	signed long personality;
+  	struct utsname *utsname;
+  	struct lxc_list cgroup;
++ 	struct lxc_sgids sgids;
+  	struct lxc_list id_map;
+  	struct lxc_list network;
+  	struct saved_nic *saved_nics;
+***************
+*** 404,409 ****
+--- 413,419 ----
+  extern int lxc_clear_hooks(struct lxc_conf *c, const char *key);
+  extern int lxc_clear_idmaps(struct lxc_conf *c);
+  extern int lxc_clear_groups(struct lxc_conf *c);
++ extern int lxc_clear_sgids(struct lxc_conf *c);
+  extern int lxc_clear_environment(struct lxc_conf *c);
+  extern int lxc_delete_autodev(struct lxc_handler *handler);
+  
+***************
+*** 423,428 ****
+--- 433,439 ----
+  extern int mapped_hostid(unsigned id, struct lxc_conf *conf, enum idtype idtype);
+  extern int chown_mapped_root(char *path, struct lxc_conf *conf);
+  extern int ttys_shift_ids(struct lxc_conf *c);
++ extern int prepare_sgids(struct lxc_conf *c);
+  extern int userns_exec_1(struct lxc_conf *conf, int (*fn)(void *), void *data);
+  extern int parse_mntopts(const char *mntopts, unsigned long *mntflags,
+  			 char **mntdata);
+diff -Nrc original-lxc-1.1.4/src/lxc/confile.c lxc-1.1.4/src/lxc/confile.c
+*** original-lxc-1.1.4/src/lxc/confile.c	2015-10-06 15:18:16.000000000 +0100
+--- lxc-1.1.4/src/lxc/confile.c	2015-10-29 15:54:16.694858129 +0000
+***************
+*** 64,69 ****
+--- 64,71 ----
+  static int config_lsm_se_context(const char *, const char *, struct lxc_conf *);
+  static int config_cgroup(const char *, const char *, struct lxc_conf *);
+  static int config_idmap(const char *, const char *, struct lxc_conf *);
++ static int config_sgids_add(const char *, const char *, struct lxc_conf *);
++ static int config_sgids_auto(const char *, const char *, struct lxc_conf *);
+  static int config_loglevel(const char *, const char *, struct lxc_conf *);
+  static int config_logfile(const char *, const char *, struct lxc_conf *);
+  static int config_mount(const char *, const char *, struct lxc_conf *);
+***************
+*** 118,123 ****
+--- 120,127 ----
+  	{ "lxc.se_context",           config_lsm_se_context       },
+  	{ "lxc.cgroup",               config_cgroup               },
+  	{ "lxc.id_map",               config_idmap                },
++ 	{ "lxc.sgids.add",            config_sgids_add            },
++ 	{ "lxc.sgids.auto",           config_sgids_auto           },
+  	{ "lxc.loglevel",             config_loglevel             },
+  	{ "lxc.logfile",              config_logfile              },
+  	{ "lxc.mount.entry",          config_mount                },
+***************
+*** 1154,1159 ****
+--- 1158,1216 ----
+  	return ret;
+  }
+  
++ static int config_sgids_add(const char *key, const char *value,
++ 			    struct lxc_conf *lxc_conf)
++ {
++ 	char *groups, *groupptr, *sptr, *token;
++ 	struct lxc_list *grouplist;
++ 	int ret = -1;
++ 
++ 	if (!strlen(value))
++ 		return lxc_clear_sgids(lxc_conf);
++ 
++ 	groups = strdup(value);
++ 	if (!groups) {
++ 		SYSERROR("failed to dup '%s'", value);
++ 		return -1;
++ 	}
++ 
++ 	/* in case several groups are specified in a single line
++ 	 * split these groups in a single element for the list */
++ 	for (groupptr = groups;;groupptr = NULL) {
++                 token = strtok_r(groupptr, " \t", &sptr);
++                 if (!token) {
++ 			ret = 0;
++                         break;
++ 		}
++ 
++ 		grouplist = malloc(sizeof(*grouplist));
++ 		if (!grouplist) {
++ 			SYSERROR("failed to allocate groups list");
++ 			break;
++ 		}
++ 
++ 		grouplist->elem = strdup(token);
++ 		if (!grouplist->elem) {
++ 			SYSERROR("failed to dup '%s'", token);
++ 			free(grouplist);
++ 			break;
++ 		}
++ 
++ 		lxc_list_add_tail(&lxc_conf->sgids.groups, grouplist);
++         }
++ 
++ 	free(groups);
++ 
++ 	return ret;
++ }
++ 
++ static int config_sgids_auto(const char *key, const char *value,
++ 			     struct lxc_conf *lxc_conf)
++ {
++ 	(void) key;
++ 	return config_string_item(&lxc_conf->sgids.group_user, value);
++ }
++ 
+  static int config_environment(const char *key, const char *value,
+                                struct lxc_conf *lxc_conf)
+  {
+diff -Nrc original-lxc-1.1.4/src/lxc/start.c lxc-1.1.4/src/lxc/start.c
+*** original-lxc-1.1.4/src/lxc/start.c	2015-10-06 15:18:16.000000000 +0100
+--- lxc-1.1.4/src/lxc/start.c	2015-10-29 15:54:16.695858122 +0000
+***************
+*** 662,667 ****
+--- 662,672 ----
+  	if (read_unpriv_netifindex(&handler->conf->network) < 0)
+  		goto out_warn_father;
+  
++ 	if (prepare_sgids(handler->conf)) {
++  		ERROR("failed to prepare the supplementary GIDs");
++ 		goto out_warn_father;
++ 	}
++ 
+  	/*
+  	 * if we are in a new user namespace, become root there to have
+  	 * privilege over our namespace
+***************
+*** 676,682 ****
+  			SYSERROR("setuid");
+  			goto out_warn_father;
+  		}
+! 		if (setgroups(0, NULL)) {
+  			SYSERROR("setgroups");
+  			goto out_warn_father;
+  		}
+--- 681,696 ----
+  			SYSERROR("setuid");
+  			goto out_warn_father;
+  		}
+! 	}
+! 
+! 	if (handler->conf->sgids.setgroups) {
+!         	size_t i;
+! 
+! 		NOTICE("resetting supplementary groups (count: %zu)", handler->conf->sgids.ngids);
+! 		for (i = 0; i < handler->conf->sgids.ngids; ++i) {
+! 			DEBUG("gid=%u", (unsigned) handler->conf->sgids.gids[i]);
+! 		}
+! 		if (setgroups(handler->conf->sgids.ngids, handler->conf->sgids.gids)) {
+  			SYSERROR("setgroups");
+  			goto out_warn_father;
+  		}
