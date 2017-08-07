@@ -52,6 +52,7 @@ CONTAINER_SUPPORT=true' ${rootDir}/etc/device.properties
             if [ -f "${rootDir}/lib/rdk/dumpLogs.sh" ];then
                 sed -i 's|'${LXC_DISABLE_DLOG_DEMON}'| |g' "${rootDir}/lib/rdk/dumpLogs.sh"
                 sed -i 's|'\${log_prefix}/${LXC_DISABLE_DLOG_FILE}'| |g' "${rootDir}/lib/rdk/dumpLogs.sh"
+                sed -i 's|'${LXC_DISABLE_DLOG_FILE}'| |g' "${rootDir}/lib/rdk/dumpLogs.sh"
             fi
         fi
 
