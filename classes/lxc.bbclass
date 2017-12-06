@@ -16,7 +16,7 @@ lxc_postinst() {
 
 rootDir="$D"
 
-if type lxc-create >/dev/null 2>/dev/null; then
+if ${@ 'true' if "container" in d.getVar('MACHINEOVERRIDES', True) else 'false' }; then
 
     mkdir -p ${rootDir}${LXC_PATH}
     echo "Executing : lxc-create -t ${rootDir}/usr/share/lxc/templates/${LXC_TEMPLATE} -n ${LXC_NAME} -P ${rootDir}${LXC_PATH} -f ${NATIVE_ROOT}/${sysconfdir}/lxc/default.conf"
