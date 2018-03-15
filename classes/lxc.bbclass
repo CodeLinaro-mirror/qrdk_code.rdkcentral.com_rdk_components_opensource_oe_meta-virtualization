@@ -67,6 +67,36 @@ ConditionPathExists=!/opt/lxc_service_disabled' ${rootDir}/lib/systemd/system/lx
             sed -i '/Description=/a\
 ConditionPathExists=/opt/lxc_service_disabled' ${rootDir}/lib/systemd/system/xre-receiver.service
         fi
+
+        ## update wpecdmi.service with conditional flag
+        if [ -f "${rootDir}/lib/systemd/system/wpecdmi.service" ];then
+
+            sed -i '/Description=/a\
+ConditionPathExists=/opt/lxc_service_disabled' ${rootDir}/lib/systemd/system/wpecdmi.service
+
+            sed -i '/ln -sf \/lib\/systemd\/system\/xre-receiver.service $tmpdir\/etc\/systemd\/system\/multi-user.target.wants\//a\
+ln -sf /lib/systemd/system/wpecdmi.service $tmpdir/etc/systemd/system/multi-user.target.wants/' ${rootDir}/usr/share/lxc/hooks/rdksystemdhook
+
+            sed -i '/mount -o bind \/tmp\/etc\/systemd \/etc\/system/i\
+cat<<EOF >$tmpdir/lib/systemd/system/wpecdmi.service\
+[Unit]\
+Description=wpecdmi\
+\
+[Service]\
+PIDFile=/var/run/WPEcdmi.pid\
+EnvironmentFile=-/etc/webbridge/WPEFramework.env\
+Environment="WAYLAND_DISPLAY=wayland-0"\
+Environment="XDG_RUNTIME_DIR=/run"\
+ExecStart=/usr/bin/WPEcdmi -b\
+ExecStop=/bin/kill -HUP $MAINPID\
+\
+[Install]\
+WantedBy=multi-user.target\
+EOF\
+                   ' ${rootDir}/usr/share/lxc/hooks/rdksystemdhook
+
+        fi
+
     fi
 
 fi
