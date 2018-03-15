@@ -67,19 +67,6 @@ ConditionPathExists=!/opt/lxc_service_disabled' ${rootDir}/lib/systemd/system/lx
             sed -i '/Description=/a\
 ConditionPathExists=/opt/lxc_service_disabled' ${rootDir}/lib/systemd/system/xre-receiver.service
         fi
-
-        ## update playreadycdmi.service with conditional flag
-        if [ -f "${rootDir}/lib/systemd/system/playreadycdmi.service" ];then
-            sed -i '/Description=/a\
-ConditionPathExists=/opt/lxc_service_disabled' ${rootDir}/lib/systemd/system/playreadycdmi.service
-        fi
-
-        ## update rpcbind.service with conditional flag
-        if [ -f "${rootDir}/lib/systemd/system/rpcbind.service" ];then
-            sed -i '/Description=/a\
-ConditionPathExists=/opt/lxc_service_disabled' ${rootDir}/lib/systemd/system/rpcbind.service
-        fi
-
     fi
 
 fi
