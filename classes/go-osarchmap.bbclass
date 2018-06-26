@@ -23,7 +23,7 @@ def go_map_arch(a, d):
         return 'arm64'
     elif re.match('p(pc|owerpc)(|64)', a):
         return 'powerpc'
-    elif re.match('mipsel', a):
+    elif re.match('mips(|el)', a):
         return 'mipsle'
     else:
         bb.error("cannot map '%s' to a Go architecture" % a)
