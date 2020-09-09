@@ -2,7 +2,7 @@ Date: Thu 27 Feb 17:06:53 GMT 2020
 From: xione
 Subject: Use correct version of runc for sky-dobby
 Source: COMCAST
-License: GPLV2
+License: BSD-3
 Upstream-Status: Pending
 Signed-off-by: Kamal Mortoza <kamal.mortoza@sky.uk>
 
